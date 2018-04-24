@@ -1,1 +1,6 @@
-//granger causation
+bitstock <- read.csv(file.choose())
+head(bitstock)
+attach(bitstock)
+par(mfrow=c(2,1))
+plot.ts(bitcoin)
+plot.ts(stock)

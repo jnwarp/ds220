@@ -22,8 +22,14 @@ class bitpayUSD():
         # make timestamp the index
         self.df.set_index('date', inplace=True)
 
+        # drop unneeded columns
+        self.df = self.df.drop('vol', axis=1)
+
         # get daily totals instead of hourly info
-        self.df = self.df.resample(period, how={'usd': 'ohlc', 'vol': np.sum})
+        self.df = self.df.resample(period, how='ohlc')
+        self.df.columns = ['open', 'high', 'low', 'close']
+
+        self.df = self.df.drop(['open', 'high', 'low'], axis=1)
 
         # drop empty rows
         self.df = self.df.dropna(axis=0)
@@ -44,8 +50,23 @@ class GSPC():
 
         self.df.columns = ['date', 'open', 'high', 'low', 'close', 'adj_close', 'vol']
 
+        self.df.set_index('date', inplace=True)
+
+        self.df = self.df.drop(['open', 'high', 'low', 'adj_close', 'vol'], axis=1)
+
+def matchPrices(gspc, bp):
+    print(bp.df)
+    print(gspc.df)
+
+    df = gspc.df.join(bp.df, lsuffix='_sp500', rsuffix='_btc')
+    print(df)
+    return df
+
+
+
 
 bp = bitpayUSD()
-#bp.df.to_csv('processed/bitpayUSD.csv')
+bp.df.to_csv('processed/bitpayUSD.csv')
 
-#gspc = GSPC()
+gspc = GSPC()
+matchPrices(gspc, bp).to_csv('processed/combined.csv')
