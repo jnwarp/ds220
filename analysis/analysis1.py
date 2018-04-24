@@ -7,6 +7,7 @@ from matplotlib.pylab import rcParams
 rcParams['figure.figsize'] = 15, 6
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf, pacf
+from statsmodels.tsa.arima_model import ARIMA
 
 
 def assembleData(filename, year, flag):
@@ -31,9 +32,9 @@ def test_stationarity(timeseries):
     
     #Determing rolling statistics
     #rolmean = pd.rolling_mean(timeseries, window=12)
-    rolmean = timeseries.rolling(window=12,center=False).mean()
+    rolmean = timeseries.rolling(window=7,center=False).mean()
     #rolstd = pd.rolling_std(timeseries, window=12)
-    rolstd = timeseries.rolling(window=12,center=False).std()
+    rolstd = timeseries.rolling(window=7,center=False).std()
 
     #Plot rolling statistics:
     orig = plt.plot(timeseries, color='blue',label='Original')
@@ -54,12 +55,98 @@ def test_stationarity(timeseries):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def ARIMA_AR(TransformedTimeSeries, differencedTS):
+	#(endog, order, exog, dates, freq, missing)
+	#model = ARIMA(series, order=(5,1,0))
+	model = ARIMA(TransformedTimeSeries, order=(2,1,0))  
+	results_AR = model.fit(disp=-1)  
+	plt.plot(differencedTS)
+	plt.plot(results_AR.fittedvalues, color='red')
+	plt.title('RSS: %.4f'% sum((results_AR.fittedvalues-differencedTS)**2))
+	plt.show()
+
+def ARIMA_MA(TransformedTimeSeries, differencedTS):
+	model = ARIMA(TransformedTimeSeries, order=(0, 1, 2))  
+	results_MA = model.fit(disp=-1)  
+	plt.plot(differencedTS)
+	plt.plot(results_MA.fittedvalues, color='red')
+	plt.title('RSS: %.4f'% sum((results_MA.fittedvalues-differencedTS)**2))
+	plt.show()
+
+def ARIMA_both(TransformedTimeSeries, differencedTS, ts):
+	model = ARIMA(TransformedTimeSeries, order=(1,1,1))  
+	results = model.fit(disp=-1)  
+	#plt.plot(differencedTS)
+	#plt.plot(results_ARIMA.fittedvalues, color='red')
+	#plt.title('RSS: %.4f'% sum((results_ARIMA.fittedvalues-differencedTS)**2))
+	#plt.show()
+
+
+	predictions_ARIMA_diff = pd.Series(results.fittedvalues, copy=True)
+	predictions_ARIMA_diff_cumsum = predictions_ARIMA_diff.cumsum()
+	predictions_ARIMA_log = pd.Series(TransformedTimeSeries.ix[0], index=TransformedTimeSeries.index)
+	predictions_ARIMA_log = predictions_ARIMA_log.add(predictions_ARIMA_diff_cumsum,fill_value=0)
+	predictions_ARIMA = np.exp(predictions_ARIMA_log)
+	plt.plot(ts)
+	plt.plot(predictions_ARIMA)
+	plt.title('RMSE: %.4f'% np.sqrt(sum((predictions_ARIMA-ts)**2)/len(ts)))
+	plt.show()
+
+
+
+	#return results
+
+def ARIMA_Forecasting(ArimaResult, ts, logTrensform):
+	predictions = pd.Series(ArimaResult.fittedvalues, copy=True)
+	predictions_cumsum = predictions.cumsum()
+	predictions_ARIMA_log = pd.Series(logTrensform.ix[0], index=logTrensform.index)
+	predictions_ARIMA_log = predictions_ARIMA_log.add(predictions_cumsum,fill_value=0)
+	predictions_ARIMA = np.exp(predictions_ARIMA_log)
+	plt.plot(ts)
+	plt.plot(predictions)
+	plt.title('RMSE: %.4f'% np.sqrt(sum((predictions-ts)**2)/len(ts)))
+	plt.show()
+	#print predictions_ARIMA_diff.head()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 """
-@param: choice
+@param: choice		
 @param: flag		0 for ploting, 1 for returning
 """
 def doTransform(TS_Price, choice, flag):
-
 	if choice is 'log':
 		plt.title('Transform performed')
 		LogTransform = np.log(TS_Price)
@@ -116,6 +203,8 @@ def differencing(logTrensform, choice):
 		differenncing_LogTransform.dropna(inplace=True)
 		test_stationarity(differenncing_LogTransform)
 	else:
+		#print(differenncing_LogTransform)
+		differenncing_LogTransform.dropna(inplace=True)
 		return differenncing_LogTransform
 
 
@@ -140,36 +229,74 @@ def decomposition(LogTransform, flag):
 		plt.legend(loc='best')
 		plt.tight_layout()
 		plt.show()
-	else:
+	elif flag == 1:
 		decomposedResidual = residual
 		decomposedResidual.dropna(inplace=True)
 		test_stationarity(decomposedResidual)
-
-def testDecomposition():
-	ts_log_decompose = residual
-	ts_log_decompose.dropna(inplace=True)
-	test_stationarity(ts_log_decompose)
+	elif flag == 3:
+		return decomposition
+	elif flag == 4:
+		return residual
 
 
 
 def autoCorrelation(differencedTS):
-	lag_acf = acf(differencedTS, nlags=20)
-	#plt.subplot(121) 
-	plt.plot(lag_acf, color='blue')
+	#x, unbiased=False, nlags=40, qstat=False, fft=False, alpha=None, missing='none'
+	#print(differencedTS)
+
+	lag_acf = acf(differencedTS, unbiased=False, nlags=10, qstat=False, fft=False, alpha=None, missing='none')
+	x = np.arange(0, len(lag_acf))
+
+
+	lag_pacf = pacf(differencedTS, nlags=20, method='ols')
+
+	plotACF(lag_acf, lag_pacf, differencedTS)
+	#markerline, stemlines, baseline = plt.stem(x, lag_acf,'-.')
+	#plt.setp(baseline, color='r', linewidth=2)
+	#plt.axhline(y=0,linestyle='--',color='gray')
+	#plt.axhline(y=-1.96/np.sqrt(len(differencedTS)),linestyle='--',color='gray')
+	##plt.axhline(y=1.96/np.sqrt(len(differencedTS)),linestyle='--',color='gray')
+
+
+	#plt.show()
+
+
+
+
+	#plotACF(lag_acf, lag_pacf, differencedTS)
+	#plt.vlines
+	#(lag_acf, -1, 1)
+	#plt.show()
+
+def plotACF(lag_acf, lag_pacf, differencedTS):
+	x1 = np.arange(0, len(lag_acf))
+	x2 = np.arange(0, len(lag_pacf))
+
+	plt.subplot(121) 
+	#print(lag_acf)
+	#plt.plot(lag_acf)
+	markerline, stemlines, baseline = plt.stem(x1, lag_acf,'-.')
+	plt.setp(baseline, color='r', linewidth=2)
+
 	plt.axhline(y=0,linestyle='--',color='gray')
 	plt.axhline(y=-1.96/np.sqrt(len(differencedTS)),linestyle='--',color='gray')
 	plt.axhline(y=1.96/np.sqrt(len(differencedTS)),linestyle='--',color='gray')
 	plt.title('Autocorrelation (blue) partial(red)')
 
-	lag_pacf = pacf(differencedTS, nlags=20, method='ols')
-	#plt.subplot(122)
-	plt.plot(lag_pacf, color='red')
+
+	plt.subplot(122)
+
+	markerline, stemlines, baseline = plt.stem(x2, lag_pacf,'-.')
+	plt.setp(baseline, color='r', linewidth=2)
+
+	#plt.plot(lag_pacf, color='red')
 	plt.axhline(y=0,linestyle='--',color='gray')
-	plt.axhline(y=-1.96/np.sqrt(len(ts_log_diff)),linestyle='--',color='gray')
-	plt.axhline(y=1.96/np.sqrt(len(ts_log_diff)),linestyle='--',color='gray')
+	plt.axhline(y=-1.96/np.sqrt(len(differencedTS)),linestyle='--',color='gray')
+	plt.axhline(y=1.96/np.sqrt(len(differencedTS)),linestyle='--',color='gray')
 	plt.tight_layout()
 
 	plt.show()
+
 
 """
 depricated: lol -> No longer used. Just used to compare some of the manipulation methods. Newer one is @ checkStationlityAfterManipulation::method
@@ -228,22 +355,26 @@ Use it for checking stationarity of time series, or do some sort of manipulation
 @param action: 			(Srting)	describe action, 'plot' or 'get'
 @param year:			(String)	If you are looking for one year. If not, just put 'none'
 """
-def checkStationlityAfterManipulation(method, action, year):
+def manipulationTS(method, action, year):
 	filename = 'DatePrice_BitCoin.csv'
 
 	if action is 'plot':
 		if method is 'MovingAverage':
-			return MovAvg(doTransform(assembleData(filename, year, 1), 'log', 1), 'plotMovingAvgDiff')
+			MovAvg(doTransform(assembleData(filename, year, 1), 'log', 1), 'plotMovingAvgDiff')
 		elif method is 'ExponentiallyWeightedMovingAverage':
-			return calcEWMV(doTransform(assembleData(filename, year, 1), 'log', 1), 'plotExpWeightedAvg_Diff')
+			calcEWMV(doTransform(assembleData(filename, year, 1), 'log', 1), 'plotExpWeightedAvg_Diff')
 		elif method is 'differencing':
-			return differencing(doTransform(assembleData(filename, year, 1), 'log', 1), 'plot')
+			differencing(doTransform(assembleData(filename, year, 1), 'log', 1), 'plot')
 		elif method is 'decomposition':
-			return decomposition(doTransform(assembleData(filename, year, 1), 'log', 1), 1)
+			decomposition(doTransform(assembleData(filename, year, 1), 'log', 1), 0)
+		elif method is 'decomposition_Deff':
+			decomposition(doTransform(assembleData(filename, year, 1), 'log', 1), 1)
 			#flag 0 to decompose
 			# flag 1 to decomposition analysis
 		elif method is 'noAction':
-			return assembleData(filename, year, 0)
+			assembleData(filename, year, 0)
+		elif method is 'logTransformation':
+			doTransform(assembleData(filename, year, 1), 'log', 0)
 		#
 	elif action is 'get':
 		if method is 'MovingAverage':
@@ -253,11 +384,15 @@ def checkStationlityAfterManipulation(method, action, year):
 		elif method is 'differencing':
 			return differencing(doTransform(assembleData(filename, year, 1), 'log', 1), 'get')
 		elif method is 'decomposition':
-			return decomposition(doTransform(assembleData(filename, year, 1), 'log', 1), 1)
+			return decomposition(doTransform(assembleData(filename, year, 1), 'log', 1), 3)
 			#flag 0 to decompose
 			# flag 1 to decomposition analysis
+		elif method is 'decomposition_Deff':
+			return decomposition(doTransform(assembleData(filename, year, 1), 'log', 1), 4)
 		elif method is 'noAction':
-			assembleData(filename, year, 1)
+			return assembleData(filename, year, 1)
+		elif method is 'logTransformation':
+			return doTransform(assembleData(filename, year, 1), 'log', 1)
 
 
 ManipulationMethodList = {
@@ -266,12 +401,14 @@ ManipulationMethodList = {
 	1: 'MovingAverage', 						# Use of moving average
 	2: 'ExponentiallyWeightedMovingAverage', 	# Use of exponential weight moving average
 	3: 'differencing', 							# differencing
-	4: 'decomposition'							# decomposition
+	4: 'decomposition',							# decomposition
+	5: 'decomposition_Deff',						# decomposition difference
+	6: 'logTransformation'						# Log transfomration 
 }
 
 ActionList = {
-	0: 'plot', 
-	1: 'get'
+	0: 'plot', 									# plot
+	1: 'get'									# get 
 }
 
 year = {
@@ -283,12 +420,26 @@ year = {
 	5: '2018'
 }
 
+#manipulationTS(ManipulationMethodList[0], ActionList[0], year[0])
 
-diff_Diff = checkStationlityAfterManipulation(ManipulationMethodList[3], ActionList[1], year[0])
-autoCorrelation(diff_Diff)
+diff_Diff = manipulationTS(ManipulationMethodList[3], ActionList[1], year[0])
+LogTransform = manipulationTS(ManipulationMethodList[6], ActionList[1], year[0])
+original = manipulationTS(ManipulationMethodList[0], ActionList[1], year[0])
+
+#autoCorrelation(diff_Diff)
 
 
-#checkStationlityAfterManipulation(ManipulationMethodList[3], ActionList[0], year[0])
+#print(LogTransform)
+
+#
+
+
+ARIMA_both(LogTransform, diff_Diff, original)
+#ARIMA_AR(LogTransform, diff_Diff)
+
+#ARIMA_MA(LogTransform, diff_Diff)
+
+#RIMA_Forecasting(ARIMA_both(LogTransform, diff_Diff), original,LogTransform)
 
 
 
