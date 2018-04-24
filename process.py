@@ -4,6 +4,9 @@ import numpy as np
 class bitpayUSD():
     def __init__(self):
         self.preprocess()
+        self.calcVolatility()
+        print('\n\nbitpayUSD')
+        print('=========')
         print(self.df.describe())
 
     def preprocess(self, period='D'):
@@ -25,9 +28,14 @@ class bitpayUSD():
         # drop empty rows
         self.df = self.df.dropna(axis=0)
 
+    def calcVolatility(self):
+        self.df.pct_change().rolling('10D')
+
 class GSPC():
     def __init__(self):
         self.preprocess()
+        print('\n\nGSPC')
+        print('====')
         print(self.df.describe())
 
     def preprocess(self):
@@ -40,4 +48,4 @@ class GSPC():
 bp = bitpayUSD()
 #bp.df.to_csv('processed/bitpayUSD.csv')
 
-gspc = GSPC()
+#gspc = GSPC()
