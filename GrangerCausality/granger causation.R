@@ -19,7 +19,13 @@ plot.ts(btc)
 plot.ts(sp500)
 
 # does sp500 granger cause btc?
+grangertest(sp500 ~ btc, order=2)
+grangertest(sp500 ~ btc, order=3)
 grangertest(sp500 ~ btc, order=4)
+grangertest(sp500 ~ btc, order=5)
 
 # does btc granger cause sp500?
+grangertest(btc ~ sp500, order=2)
+grangertest(btc ~ sp500, order=3)
 grangertest(btc ~ sp500, order=4)
+grangertest(btc ~ sp500, order=5)
